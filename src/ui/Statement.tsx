@@ -16,7 +16,7 @@ import {
   totalIncome,
 } from '../game/finance'
 import type { Asset, Player } from '../game/types'
-import { Meter, Sparkline } from './bits'
+import { CashTicker, Meter, Sparkline } from './bits'
 import { DebtList } from './Debts'
 
 interface Props {
@@ -52,7 +52,7 @@ export function Statement({ player: p, canAct, dispatch }: Props) {
         </div>
         <div className="st-cash">
           <div className="muted small">Cash</div>
-          <div className="big">{money(p.cash)}</div>
+          <div className="big"><CashTicker value={p.cash} /></div>
         </div>
       </header>
 

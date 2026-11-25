@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { SPACE_INFO, FREEDOM_BOARD, GRIND_BOARD } from '../game/board'
 import { botAction } from '../game/bot'
 import { DREAM_BY_ID, MARKET_BY_ID } from '../game/data/cards'
@@ -9,7 +9,10 @@ import { FREEDOM_GOAL, compactMoney, freedomProgress, money, monthlyCashflow, ne
 import type { GameState, Player } from '../game/types'
 import { ActionPanel } from './ActionPanel'
 import { Board } from './Board'
-import { Dice, Meter } from './bits'
+import { CashTicker, Confetti, Dice, Meter } from './bits'
+import { SettingsPanel } from './SettingsPanel'
+import { SPEED_FACTOR, setPrefs, usePrefs } from './settings'
+import { useGameSounds } from './useGameSounds'
 import { Statement } from './Statement'
 import { useAnimatedPositions } from './useAnimatedPositions'
 
@@ -22,7 +25,8 @@ interface Props {
   onHowTo: () => void
 }
 
-const BOT_DELAY = 750
+/** Base pauses (ms) for computer turns at Normal speed. */
+const BOT_PAUSE = { roll: 1100, chooseDeal: 1200, cardRead: 2800, cardFollowUp: 1300, endTurn: 1800 }
 
 function botStep(g: GameState): GameState {
   const a = botAction(g)
@@ -70,12 +74,24 @@ export function GameView({ game: s, setGame, onMenu, onHowTo }: Props) {
   }, [s.current])
   const viewed = s.players.find((p) => p.id === viewId) ?? (cur.isBot ? s.players.find((p) => !p.isBot) ?? cur : cur)
 
-  // Drive computer players.
+  const prefs = usePrefs()
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  useGameSounds(s, shown, moving)
+
+  // Drive computer players, pausing long enough to read each card they draw.
+  const cardSeen = useRef<{ sig: string; at: number }>({ sig: '', at: 0 })
   useEffect(() => {
-    if (!cur.isBot || s.phase === 'gameover' || moving || waitingForHumans) return
-    const t = setTimeout(() => setGame((g) => (g ? botStep(g) : g)), BOT_DELAY)
+    if (!cur.isBot || s.phase === 'gameover' || moving || waitingForHumans || settingsOpen) return
+    const sig = s.pending ? `${s.turn}:${JSON.stringify(s.pending)}` : ''
+    const now = performance.now()
+    if (sig !== cardSeen.current.sig) cardSeen.current = { sig, at: now }
+    let base: number
+    if (!s.pending) base = s.phase === 'roll' ? BOT_PAUSE.roll : BOT_PAUSE.endTurn
+    else if (s.pending.type === 'chooseDeal') base = BOT_PAUSE.chooseDeal
+    else base = Math.max(BOT_PAUSE.cardFollowUp, BOT_PAUSE.cardRead - (now - cardSeen.current.at))
+    const t = setTimeout(() => setGame((g) => (g ? botStep(g) : g)), base * SPEED_FACTOR[prefs.botSpeed])
     return () => clearTimeout(t)
-  }, [s, cur.isBot, moving, waitingForHumans, setGame])
+  }, [s, cur.isBot, moving, waitingForHumans, setGame, prefs.botSpeed, settingsOpen])
 
   // Keyboard shortcuts for desktop: Space rolls / ends the turn, S and B pick a deal size.
   useEffect(() => {
@@ -124,6 +140,7 @@ export function GameView({ game: s, setGame, onMenu, onHowTo }: Props) {
         {cur.isBot && <span className="tag">bot</span>}
       </div>
       <Dice values={s.lastRoll ?? []} rollKey={rollKey} />
+      <CashTicker value={cur.cash} hold={moving} className="center-cash" />
       {!moving && s.phase !== 'roll' && (
         <div className="center-space">
           {SPACE_INFO[space].icon} {SPACE_INFO[space].label}
@@ -190,8 +207,11 @@ export function GameView({ game: s, setGame, onMenu, onHowTo }: Props) {
           ))}
         </div>
         <div className="top-actions">
-          <button className="icon-btn" onClick={onHowTo} aria-label="How to play">?</button>
-          <button className="icon-btn" onClick={onMenu} aria-label="Menu">☰</button>
+          <button className="icon-btn" onClick={() => setPrefs({ muted: !prefs.muted })} aria-label={prefs.muted ? 'Unmute' : 'Mute sound and music'}
+            title={prefs.muted ? 'Unmute' : 'Mute all'}>{prefs.muted ? '🔇' : '🔊'}</button>
+          <button className="icon-btn" onClick={() => setSettingsOpen(true)} aria-label="Settings" title="Settings">⚙︎</button>
+          <button className="icon-btn hide-sm" onClick={onHowTo} aria-label="How to play" title="How to play">?</button>
+          <button className="icon-btn" onClick={onMenu} aria-label="Main menu" title="Main menu">☰</button>
         </div>
       </header>
 
@@ -203,7 +223,8 @@ export function GameView({ game: s, setGame, onMenu, onHowTo }: Props) {
           </aside>
         )}
         <section className="board-col">
-          <Board track={track} players={s.players} shown={shown} currentId={cur.id} myDreamId={cur.freedom?.dreamId}>
+          <Board track={track} players={s.players} shown={shown} currentId={cur.id} myDreamId={cur.freedom?.dreamId}
+            landKey={!moving && s.lastRoll ? rollKey : undefined}>
             {center}
           </Board>
           <div className="panel-mobile">{panel}</div>
@@ -237,6 +258,8 @@ export function GameView({ game: s, setGame, onMenu, onHowTo }: Props) {
       </nav>
 
       {s.phase === 'gameover' && <GameOver s={s} onMenu={onMenu} />}
+      {(s.phase === 'gameover' || s.pending?.type === 'escape') && !moving && <Confetti key={`${s.phase}:${s.current}`} />}
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
     </div>
   )
 }

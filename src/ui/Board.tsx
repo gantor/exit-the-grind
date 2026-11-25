@@ -22,10 +22,12 @@ interface Props {
   shown: Record<string, { track: string; pos: number }>
   currentId: string
   myDreamId?: string
+  /** Changes each time a token lands, to replay the landing ripple. */
+  landKey?: string
   children?: ReactNode
 }
 
-export function Board({ track, players, shown, currentId, myDreamId, children }: Props) {
+export function Board({ track, players, shown, currentId, myDreamId, landKey, children }: Props) {
   const spaces = track === 'grind' ? GRIND_BOARD : FREEDOM_BOARD
   const here = players.filter((p) => shown[p.id]?.track === track)
   const currentPos = shown[currentId]?.track === track ? shown[currentId].pos : -1
@@ -45,6 +47,7 @@ export function Board({ track, players, shown, currentId, myDreamId, children }:
             style={{ gridRow: r + 1, gridColumn: c + 1 }}
             title={dream ? `${dream.title}: $${dream.cost.toLocaleString()}` : `${info.label}: ${info.hint}`}
           >
+            {i === currentPos && landKey && <span key={landKey} className="ripple" aria-hidden />}
             <span className="tile-icon" aria-hidden>{dream ? dream.emoji : info.icon}</span>
             <span className="tile-label">{dream ? dream.title.split(' ').slice(-1)[0] : SHORT[sp]}</span>
             {tokens.length > 0 && (

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { compactMoney } from '../game/finance'
+import { useEffect, useRef, useState } from 'react'
+import { compactMoney, money } from '../game/finance'
 import type { HistoryPoint } from '../game/types'
 
 const PIPS: Record<number, number[]> = {
@@ -76,5 +76,90 @@ export function Sparkline({ history }: { history: HistoryPoint[] }) {
         <span className="key key-exp" /> Expenses {compactMoney(last.expenses)}
       </figcaption>
     </figure>
+  )
+}
+
+/**
+ * Money that counts up/down to its new value with a floating "+$1,200" bubble.
+ * While `hold` is true (tokens still moving) it keeps showing the old amount.
+ */
+export function CashTicker({ value, hold = false, className }: { value: number; hold?: boolean; className?: string }) {
+  const [shown, setShown] = useState(value)
+  const [pops, setPops] = useState<{ id: number; diff: number }[]>([])
+  const target = useRef(value)
+  const from = useRef(value)
+
+  useEffect(() => {
+    if (hold || value === target.current) return
+    const diff = value - target.current
+    from.current = target.current
+    target.current = value
+    const id = Date.now() + Math.random()
+    setPops((p) => [...p.slice(-2), { id, diff }])
+    const t0 = performance.now()
+    const dur = Math.min(900, 250 + Math.abs(diff) / 40)
+    let raf = 0
+    const step = (t: number) => {
+      const k = Math.min(1, (t - t0) / dur)
+      const eased = 1 - Math.pow(1 - k, 3)
+      setShown(Math.round(from.current + (target.current - from.current) * eased))
+      if (k < 1) raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    setTimeout(() => setPops((p) => p.filter((x) => x.id !== id)), 1600)
+    return () => {
+      cancelAnimationFrame(raf)
+      setShown(target.current)
+    }
+  }, [value, hold])
+
+  return (
+    <span className={`ticker ${className ?? ''}`}>
+      {money(shown)}
+      {pops.map((p) => (
+        <span key={p.id} className={`pop ${p.diff >= 0 ? 'pop-up' : 'pop-down'}`} aria-hidden>
+          {money(p.diff, { sign: true })}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+const CONFETTI_COLORS = ['#34d399', '#a78bfa', '#fbbf24', '#60a5fa', '#f472b6', '#2dd4bf']
+
+/** A one-shot burst of confetti over the whole screen. */
+export function Confetti({ pieces = 120 }: { pieces?: number }) {
+  const [bits] = useState(() =>
+    Array.from({ length: pieces }, (_, i) => ({
+      left: Math.random() * 100,
+      delay: Math.random() * 0.6,
+      dur: 2.2 + Math.random() * 1.6,
+      drift: (Math.random() - 0.5) * 240,
+      spin: (Math.random() - 0.5) * 1080,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      w: 6 + Math.random() * 6,
+      round: Math.random() < 0.3,
+    })),
+  )
+  return (
+    <div className="confetti-layer" aria-hidden>
+      {bits.map((b, i) => (
+        <span
+          key={i}
+          className="confetti-bit"
+          style={{
+            left: `${b.left}%`,
+            width: b.w,
+            height: b.round ? b.w : b.w * 1.6,
+            borderRadius: b.round ? '50%' : 2,
+            background: b.color,
+            animationDelay: `${b.delay}s`,
+            animationDuration: `${b.dur}s`,
+            ['--drift' as string]: `${b.drift}px`,
+            ['--spin' as string]: `${b.spin}deg`,
+          }}
+        />
+      ))}
+    </div>
   )
 }

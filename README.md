@@ -26,6 +26,13 @@ npm run preview
 
 Deployment is handled by `.github/workflows/deploy.yml`: it runs the tests, builds, and publishes `dist/` to GitHub Pages.
 
+## Sound & music
+
+Sound effects are synthesized in the browser (`src/ui/sound.ts`), so there are no audio files to load.
+Background music is a shuffled playlist (`public/audio/theme-*.mp3`, listed in `TRACKS` in `src/ui/music.ts`) that
+crossfades between songs and dips under big sound effects. Players can mute everything from the top bar, or adjust
+sound, music and skip songs in Settings (⚙︎).
+
 ## Rules in short
 
 - Pick a career. Each has a salary, monthly expenses, and debts.
