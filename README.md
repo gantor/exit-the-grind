@@ -6,6 +6,11 @@ desktop or phone, and installs like an app (PWA) with offline play and autosave.
 
 ## Play
 
+**Online:** https://gantor.github.io/exit-the-grind/ (redeploys automatically on every push to `main`).
+On a phone, open it and use **Share → Add to Home Screen** (iPhone) or **Install app** (Android) to play it like an app, offline too.
+
+Locally:
+
 ```bash
 npm install
 npm run dev        # http://localhost:5173 on this Mac
@@ -19,8 +24,7 @@ npm run build
 npm run preview
 ```
 
-To install it on a phone, host `dist/` on any HTTPS static host (GitHub Pages, Netlify, Vercel, Cloudflare Pages),
-open it on the phone, and use **Share → Add to Home Screen** (iPhone) or **Install app** (Android).
+Deployment is handled by `.github/workflows/deploy.yml`: it runs the tests, builds, and publishes `dist/` to GitHub Pages.
 
 ## Rules in short
 
